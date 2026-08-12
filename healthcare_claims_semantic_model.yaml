@@ -1,0 +1,801 @@
+name: healthcare_claims_analyst
+description: |
+  Semantic model for healthcare claims analytics. Supports claim volume,
+  claim amounts, payments, denials, providers, beneficiaries, diagnoses,
+  and time-based analysis.
+tables:
+  - name: fact_claims
+    description: |
+      Central fact table containing one record for each healthcare claim.
+      Contains claim identifiers, claim type, claim status, payment information,
+      claim amounts, risk level, and foreign keys to beneficiary, provider,
+      date, diagnosis, and claim status.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: FACT_CLAIMS
+    dimensions:
+      - name: beneficiary_key
+        synonyms:
+          - beneficiary foreign key
+          - beneficiary reference
+        description: |
+          Foreign key referencing the beneficiary dimension.
+        expr: BENEFICIARY_KEY
+        data_type: TEXT
+      - name: claim_id
+        synonyms:
+          - claim id
+          - claim identifier
+          - claim number
+          - clm id
+        description: |
+          Unique identifier of the healthcare claim.
+        expr: CLM_ID
+        data_type: TEXT
+      - name: claim_status
+        synonyms:
+          - claim outcome
+          - claim status
+          - status
+        description: |
+          Current status of the claim, such as APPROVED or DENIED.
+        expr: CLAIM_STATUS
+        data_type: TEXT
+      - name: claim_type
+        synonyms:
+          - claim category
+          - claim type
+          - type of claim
+        description: |
+          Type or category of the healthcare claim.
+        expr: CLAIM_TYPE
+        data_type: TEXT
+      - name: date_key
+        synonyms:
+          - date foreign key
+          - date reference
+        description: |
+          Foreign key referencing the date dimension.
+        expr: DATE_KEY
+        data_type: TEXT
+      - name: denial_reason
+        synonyms:
+          - claim denial reason
+          - denial reason
+          - reason for denial
+          - rejection reason
+        description: |
+          Reason associated with a denied claim.
+        expr: DENIAL_REASON
+        data_type: TEXT
+      - name: diagnosis_key
+        synonyms:
+          - diagnosis foreign key
+          - diagnosis reference
+        description: |
+          Foreign key referencing the diagnosis dimension.
+        expr: DIAGNOSIS_KEY
+        data_type: TEXT
+      - name: payment_status
+        synonyms:
+          - claim payment status
+          - payment state
+          - payment status
+        description: |
+          Payment status associated with the claim.
+        expr: PAYMENT_STATUS
+        data_type: TEXT
+      - name: provider_key
+        synonyms:
+          - provider foreign key
+          - provider reference
+        description: |
+          Foreign key referencing the provider dimension.
+        expr: PROVIDER_KEY
+        data_type: TEXT
+      - name: risk_level
+        synonyms:
+          - claim risk
+          - risk category
+          - risk level
+        description: |
+          Risk classification associated with the claim.
+        expr: RISK_LEVEL
+        data_type: TEXT
+    facts:
+      - name: approval_percent
+        synonyms:
+          - approval percent
+          - approval percentage
+        description: |
+          Percentage of the claim amount covered by insurance.
+        expr: APPROVAL_PERCENT
+        data_type: FLOAT
+      - name: claim_amount
+        synonyms:
+          - billed amount
+          - claim amount
+          - claim value
+        description: |
+          Monetary amount billed for the claim.
+        expr: CLAIM_AMOUNT
+        data_type: FLOAT
+      - name: insurance_payment
+        synonyms:
+          - insurance paid
+          - insurance payment
+          - insurer payment
+        description: |
+          Amount paid by the insurance provider.
+        expr: INSURANCE_PAYMENT
+        data_type: FLOAT
+      - name: patient_payment
+        synonyms:
+          - out of pocket payment
+          - patient amount
+          - patient paid
+          - patient payment
+        description: |
+          Amount paid by the patient.
+        expr: PATIENT_PAYMENT
+        data_type: FLOAT
+    metrics:
+      - name: approved_claim_count
+        synonyms:
+          - approved claim count
+          - approved claims
+          - number of approved claims
+        description: |
+          Number of unique claims with APPROVED status.
+        expr: |
+          COUNT(DISTINCT CASE
+            WHEN CLAIM_STATUS = 'APPROVED'
+            THEN CLM_ID
+          END)
+      - name: average_claim_amount
+        synonyms:
+          - average claim amount
+          - avg claim amount
+          - mean claim amount
+        description: |
+          Average billed amount per claim.
+        expr: AVG(CLAIM_AMOUNT)
+      - name: average_insurance_payment
+        synonyms:
+          - average insurance payment
+          - average insurer payment
+        description: |
+          Average insurance payment.
+        expr: AVG(INSURANCE_PAYMENT)
+      - name: average_patient_payment
+        synonyms:
+          - average patient amount
+          - average patient payment
+        description: |
+          Average patient payment.
+        expr: AVG(PATIENT_PAYMENT)
+      - name: claim_count
+        synonyms:
+          - claim count
+          - claims count
+          - count of claims
+          - number of claims
+          - total claims
+        description: |
+          Total number of unique healthcare claims.
+        expr: COUNT(DISTINCT CLM_ID)
+      - name: denial_percentage
+        synonyms:
+          - claim denial rate
+          - denial percentage
+          - denial rate
+          - percentage of denied claims
+        description: |
+          Percentage of unique claims that were denied.
+        expr: |
+          100.0 *
+          COUNT(DISTINCT CASE
+            WHEN CLAIM_STATUS = 'DENIED'
+            THEN CLM_ID
+          END)
+          /
+          NULLIF(COUNT(DISTINCT CLM_ID), 0)
+      - name: denied_claim_count
+        synonyms:
+          - denial count
+          - denied claim count
+          - denied claims
+          - number of denied claims
+        description: |
+          Number of unique claims with DENIED status.
+        expr: |
+          COUNT(DISTINCT CASE
+            WHEN CLAIM_STATUS = 'DENIED'
+            THEN CLM_ID
+          END)
+      - name: total_claim_amount
+        synonyms:
+          - sum of claim amount
+          - total billed amount
+          - total claim amount
+        description: |
+          Total monetary amount billed across claims.
+        expr: SUM(CLAIM_AMOUNT)
+      - name: total_insurance_payment
+        synonyms:
+          - total insurance payment
+          - total insurance payments
+          - total insurer payment
+        description: |
+          Total amount paid by insurance providers.
+        expr: SUM(INSURANCE_PAYMENT)
+      - name: total_patient_payment
+        synonyms:
+          - total out of pocket payment
+          - total patient payment
+          - total patient payments
+        description: |
+          Total amount paid by patients.
+        expr: SUM(PATIENT_PAYMENT)
+    primary_key:
+      columns:
+        - CLAIM_ID
+  - name: dim_provider
+    description: |
+      Provider dimension containing healthcare provider identifiers
+      and provider classification.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: DIM_PROVIDER
+    dimensions:
+      - name: provider_id
+        synonyms:
+          - provider id
+          - provider identifier
+          - provider number
+        description: |
+          Identifier of the healthcare provider.
+        expr: PROVIDER_ID
+        data_type: TEXT
+      - name: provider_key
+        synonyms:
+          - provider dimension key
+          - provider surrogate key
+        description: |
+          Surrogate key for the provider dimension.
+        expr: PROVIDER_KEY
+        data_type: TEXT
+      - name: provider_type
+        synonyms:
+          - healthcare provider type
+          - provider category
+          - provider type
+          - type of provider
+        description: |
+          Classification of the healthcare provider.
+        expr: PROVIDER_TYPE
+        data_type: TEXT
+    primary_key:
+      columns:
+        - PROVIDER_KEY
+  - name: dim_beneficiary
+    description: |
+      Beneficiary dimension containing demographic and health-related
+      information for healthcare claim beneficiaries.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: DIM_BENEFICIARY
+    dimensions:
+      - name: age_group
+        synonyms:
+          - age category
+          - age group
+          - beneficiary age group
+        description: |
+          Age category of the beneficiary.
+        expr: AGE_GROUP
+        data_type: TEXT
+      - name: beneficiary_id
+        synonyms:
+          - beneficiary id
+          - beneficiary identifier
+          - member id
+          - patient id
+        description: |
+          Unique identifier of the beneficiary.
+        expr: DESYNPUF_ID
+        data_type: TEXT
+      - name: beneficiary_key
+        synonyms:
+          - beneficiary dimension key
+          - beneficiary surrogate key
+        description: |
+          Surrogate key for the beneficiary dimension.
+        expr: BENEFICIARY_KEY
+        data_type: TEXT
+      - name: gender
+        synonyms:
+          - beneficiary gender
+          - gender
+          - sex
+        description: |
+          Gender of the beneficiary.
+        expr: GENDER
+        data_type: TEXT
+      - name: race
+        synonyms:
+          - beneficiary race
+          - race
+        description: |
+          Race classification of the beneficiary.
+        expr: RACE
+        data_type: TEXT
+      - name: senior_citizen
+        synonyms:
+          - elderly
+          - senior
+          - senior citizen
+        description: |
+          Indicates whether the beneficiary is a senior citizen.
+        expr: SENIOR_CITIZEN
+        data_type: TEXT
+    facts:
+      - name: age
+        synonyms:
+          - age
+          - beneficiary age
+          - patient age
+        description: |
+          Age of the beneficiary.
+        expr: AGE
+        data_type: NUMBER
+    primary_key:
+      columns:
+        - BENEFICIARY_KEY
+  - name: dim_date
+    description: |
+      Date dimension used for time-based healthcare claim analysis.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: DIM_DATE
+    dimensions:
+      - name: date_key
+        synonyms:
+          - date dimension key
+          - date surrogate key
+        description: |
+          Surrogate key for the date dimension.
+        expr: DATE_KEY
+        data_type: TEXT
+      - name: day
+        synonyms:
+          - day
+          - day of month
+        description: |
+          Day of the month.
+        expr: DAY
+        data_type: NUMBER
+      - name: day_name
+        synonyms:
+          - day name
+          - weekday name
+        description: |
+          Name of the day.
+        expr: DAY_NAME
+        data_type: TEXT
+      - name: day_of_week
+        synonyms:
+          - day of week
+          - weekday
+        description: |
+          Numeric day of week.
+        expr: DAY_OF_WEEK
+        data_type: NUMBER
+      - name: is_weekend
+        synonyms:
+          - is weekend
+          - weekend
+          - weekend indicator
+        description: |
+          Indicates whether the claim date occurred on a weekend.
+        expr: IS_WEEKEND
+        data_type: BOOLEAN
+      - name: month
+        synonyms:
+          - calendar month
+          - claim month
+          - month
+        description: |
+          Numeric month associated with the claim date.
+        expr: MONTH
+        data_type: NUMBER
+      - name: month_name
+        synonyms:
+          - calendar month name
+          - month name
+        description: |
+          Full month name associated with the claim date.
+        expr: MONTH_NAME
+        data_type: TEXT
+      - name: month_short
+        synonyms:
+          - abbreviated month
+          - short month
+        description: |
+          Short month name.
+        expr: MONTH_SHORT
+        data_type: TEXT
+      - name: quarter
+        synonyms:
+          - calendar quarter
+          - claim quarter
+          - quarter
+        description: |
+          Calendar quarter associated with the claim date.
+        expr: QUARTER
+        data_type: NUMBER
+      - name: year
+        synonyms:
+          - calendar year
+          - claim year
+          - service year
+          - year
+        description: |
+          Calendar year associated with the claim date.
+        expr: YEAR
+        data_type: NUMBER
+    time_dimensions:
+      - name: full_date
+        synonyms:
+          - claim date
+          - date
+          - full date
+          - service date
+        description: |
+          Full calendar date associated with the claim.
+        expr: FULL_DATE
+        data_type: DATE
+    primary_key:
+      columns:
+        - DATE_KEY
+  - name: dim_claim_status
+    description: |
+      Claim status dimension containing claim outcome, payment status,
+      denial reason, and risk classification.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: DIM_CLAIM_STATUS
+    dimensions:
+      - name: claim_status
+        synonyms:
+          - standardized claim status
+          - status claim status
+        description: |
+          Standardized claim status.
+        expr: CLAIM_STATUS
+        data_type: TEXT
+      - name: status_denial_reason
+        synonyms:
+          - denial category
+          - rejection reason
+          - standardized denial reason
+        description: |
+          Standardized reason for claim denial.
+        expr: DENIAL_REASON
+        data_type: TEXT
+      - name: status_key
+        synonyms:
+          - claim status dimension key
+          - claim status surrogate key
+        description: |
+          Surrogate key for the claim status dimension.
+        expr: STATUS_KEY
+        data_type: TEXT
+      - name: status_payment_status
+        synonyms:
+          - payment state
+          - standardized payment status
+        description: |
+          Standardized payment status.
+        expr: PAYMENT_STATUS
+        data_type: TEXT
+      - name: status_risk_level
+        synonyms:
+          - claim risk
+          - risk category
+          - standardized risk level
+        description: |
+          Standardized claim risk classification.
+        expr: RISK_LEVEL
+        data_type: TEXT
+    primary_key:
+      columns:
+        - STATUS_KEY
+  - name: dim_diagnosis
+    description: |
+      Diagnosis dimension containing diagnosis codes associated with
+      healthcare claims.
+    base_table:
+      database: HEALTHCARE_CLAIMS_DB
+      schema: GOLD
+      table: DIM_DIAGNOSIS
+    dimensions:
+      - name: diagnosis_code
+        synonyms:
+          - diagnosis
+          - diagnosis code
+          - diagnosis identifier
+          - medical diagnosis
+        description: |
+          Diagnosis code associated with the claim.
+        expr: DIAGNOSIS_CODE
+        data_type: TEXT
+      - name: diagnosis_key
+        synonyms:
+          - diagnosis dimension key
+          - diagnosis surrogate key
+        description: |
+          Surrogate key for the diagnosis dimension.
+        expr: DIAGNOSIS_KEY
+        data_type: TEXT
+    primary_key:
+      columns:
+        - DIAGNOSIS_KEY
+relationships:
+  - name: claims_to_beneficiary
+    left_table: fact_claims
+    right_table: dim_beneficiary
+    relationship_columns:
+      - left_column: beneficiary_key
+        right_column: BENEFICIARY_KEY
+  - name: claims_to_provider
+    left_table: fact_claims
+    right_table: dim_provider
+    relationship_columns:
+      - left_column: provider_key
+        right_column: PROVIDER_KEY
+  - name: claims_to_date
+    left_table: fact_claims
+    right_table: dim_date
+    relationship_columns:
+      - left_column: date_key
+        right_column: DATE_KEY
+  - name: claims_to_diagnosis
+    left_table: fact_claims
+    right_table: dim_diagnosis
+    relationship_columns:
+      - left_column: diagnosis_key
+        right_column: DIAGNOSIS_KEY
+  - name: claims_to_status
+    left_table: fact_claims
+    right_table: dim_claim_status
+    relationship_columns:
+      - left_column: claim_status
+        right_column: CLAIM_STATUS
+verified_queries:
+  - name: total_claim_count
+    question: How many claims are there?
+    verified_by: Healthcare Claims Analytics
+    use_as_onboarding_question: true
+    sql: |
+      SELECT COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS;
+  - name: claim_count_by_provider_type
+    question: Show claim count for each provider type.
+    verified_by: Healthcare Claims Analytics
+    use_as_onboarding_question: true
+    sql: |
+      SELECT
+        dp.PROVIDER_TYPE,
+        COUNT(DISTINCT fc.CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_PROVIDER dp
+        ON fc.PROVIDER_KEY = dp.PROVIDER_KEY
+      GROUP BY dp.PROVIDER_TYPE
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_year
+    question: Show claim count for each year.
+    verified_by: Healthcare Claims Analytics
+    use_as_onboarding_question: true
+    sql: |
+      SELECT
+        dd.YEAR,
+        COUNT(DISTINCT fc.CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_DATE dd
+        ON fc.DATE_KEY = dd.DATE_KEY
+      WHERE dd.YEAR IN (2008, 2009, 2010)
+      GROUP BY dd.YEAR
+      ORDER BY dd.YEAR;
+  - name: claim_count_by_claim_status
+    question: Show claim count for each claim status.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        CLAIM_STATUS,
+        COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS
+      GROUP BY CLAIM_STATUS
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_claim_type
+    question: Show claim count for each claim type.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        CLAIM_TYPE,
+        COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS
+      GROUP BY CLAIM_TYPE
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_payment_status
+    question: Show claim count for each payment status.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        PAYMENT_STATUS,
+        COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS
+      GROUP BY PAYMENT_STATUS
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_risk_level
+    question: Show claim count for each risk level.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        RISK_LEVEL,
+        COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS
+      GROUP BY RISK_LEVEL
+      ORDER BY CLAIM_COUNT DESC;
+  - name: denial_percentage
+    question: What is the denial percentage?
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        100.0 *
+        COUNT(DISTINCT CASE
+          WHEN CLAIM_STATUS = 'DENIED'
+          THEN CLM_ID
+        END)
+        /
+        NULLIF(COUNT(DISTINCT CLM_ID), 0)
+        AS DENIAL_PERCENTAGE
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS;
+  - name: denial_percentage_by_year
+    question: What is the denial percentage for each year?
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        dd.YEAR,
+        100.0 *
+        COUNT(DISTINCT CASE
+          WHEN fc.CLAIM_STATUS = 'DENIED'
+          THEN fc.CLM_ID
+        END)
+        /
+        NULLIF(COUNT(DISTINCT fc.CLM_ID), 0)
+        AS DENIAL_PERCENTAGE
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_DATE dd
+        ON fc.DATE_KEY = dd.DATE_KEY
+      WHERE dd.YEAR IN (2008, 2009, 2010)
+      GROUP BY dd.YEAR
+      ORDER BY dd.YEAR;
+  - name: total_claim_amount
+    question: What is the total claim amount?
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT SUM(CLAIM_AMOUNT) AS TOTAL_CLAIM_AMOUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS;
+  - name: total_insurance_payment
+    question: What is the total insurance payment?
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT SUM(INSURANCE_PAYMENT) AS TOTAL_INSURANCE_PAYMENT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS;
+  - name: total_patient_payment
+    question: What is the total patient payment?
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT SUM(PATIENT_PAYMENT) AS TOTAL_PATIENT_PAYMENT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS;
+  - name: total_claim_amount_by_year
+    question: Show total claim amount for each year.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        dd.YEAR,
+        SUM(fc.CLAIM_AMOUNT) AS TOTAL_CLAIM_AMOUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_DATE dd
+        ON fc.DATE_KEY = dd.DATE_KEY
+      WHERE dd.YEAR IN (2008, 2009, 2010)
+      GROUP BY dd.YEAR
+      ORDER BY dd.YEAR;
+  - name: total_insurance_payment_by_year
+    question: Show total insurance payment for each year.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        dd.YEAR,
+        SUM(fc.INSURANCE_PAYMENT) AS TOTAL_INSURANCE_PAYMENT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_DATE dd
+        ON fc.DATE_KEY = dd.DATE_KEY
+      WHERE dd.YEAR IN (2008, 2009, 2010)
+      GROUP BY dd.YEAR
+      ORDER BY dd.YEAR;
+  - name: claim_count_by_gender
+    question: Show claim count by gender.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        db.GENDER,
+        COUNT(DISTINCT fc.CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_BENEFICIARY db
+        ON fc.BENEFICIARY_KEY = db.BENEFICIARY_KEY
+      GROUP BY db.GENDER
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_age_group
+    question: Show claim count by age group.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        db.AGE_GROUP,
+        COUNT(DISTINCT fc.CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS fc
+      INNER JOIN HEALTHCARE_CLAIMS_DB.GOLD.DIM_BENEFICIARY db
+        ON fc.BENEFICIARY_KEY = db.BENEFICIARY_KEY
+      GROUP BY db.AGE_GROUP
+      ORDER BY CLAIM_COUNT DESC;
+  - name: claim_count_by_denial_reason
+    question: Show claim count for each denial reason.
+    verified_by: Healthcare Claims Analytics
+    sql: |
+      SELECT
+        DENIAL_REASON,
+        COUNT(DISTINCT CLM_ID) AS CLAIM_COUNT
+      FROM HEALTHCARE_CLAIMS_DB.GOLD.FACT_CLAIMS
+      WHERE DENIAL_REASON IS NOT NULL
+        AND DENIAL_REASON <> ''
+      GROUP BY DENIAL_REASON
+      ORDER BY CLAIM_COUNT DESC;
+module_custom_instructions:
+  sql_generation: |
+    Always use FACT_CLAIMS as the primary claim fact table.
+    Use COUNT(DISTINCT claim_id) when calculating claim counts.
+    For provider analysis, join FACT_CLAIMS.PROVIDER_KEY to
+    DIM_PROVIDER.PROVIDER_KEY and use DIM_PROVIDER.PROVIDER_TYPE.
+    For beneficiary analysis, join FACT_CLAIMS.BENEFICIARY_KEY to
+    DIM_BENEFICIARY.BENEFICIARY_KEY.
+    For date analysis, join FACT_CLAIMS.DATE_KEY to DIM_DATE.DATE_KEY
+    and use DIM_DATE.YEAR, QUARTER, MONTH, MONTH_NAME, or FULL_DATE.
+    For diagnosis analysis, join FACT_CLAIMS.DIAGNOSIS_KEY to
+    DIM_DIAGNOSIS.DIAGNOSIS_KEY.
+    For claim status analysis, use FACT_CLAIMS.CLAIM_STATUS.
+    Do not use DATE_KEY as a year.
+    Never infer YEAR by taking digits from DATE_KEY.
+    Use SUM for monetary totals.
+    Use COUNT(DISTINCT claim_id) for claim counts.
+    For denial percentage, calculate denied distinct claims divided by
+    total distinct claims and multiply by 100.
+    Only analyze claim years 2008, 2009, and 2010 unless the user
+    explicitly requests another year.
+    Avoid unnecessary joins.
+  question_categorization: |
+    Treat claim count, number of claims, and count of claims as claim_count.
+    Treat provider type, provider category, and type of provider as
+    DIM_PROVIDER.PROVIDER_TYPE.
+    Treat year, claim year, service year, and calendar year as DIM_DATE.YEAR.
+    Treat gender, sex, and beneficiary gender as DIM_BENEFICIARY.GENDER.
+    Treat age group, age category, and beneficiary age group as
+    DIM_BENEFICIARY.AGE_GROUP.
+    Treat denial percentage and denial rate as denial_percentage.
+    Treat claim amount, billed amount, and total claim amount according
+    to whether the user asks for a total or row-level value.
